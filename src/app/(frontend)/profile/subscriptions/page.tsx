@@ -8,25 +8,66 @@ import { ArrowUpRightIcon } from 'lucide-react'
 import Stripe from 'stripe'
 import ManageSubscriptionButton from './ManageSubscriptionButton'
 import { Alert } from '@/components/ui/Alert'
+import { Subscription } from '~/payload-types'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2022-08-01' })
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
 
 export default async function SubscriptionsPage() {
   const user = await getCurrentUser()
   const payload = await getPayload()
+
+  // Get subscription from our database
   const { docs: subscriptions } = await payload.find({
     collection: COLLECTION_SLUG_SUBSCRIPTIONS,
     where: {
       stripeCustomerId: { equals: user?.stripeCustomerId }
     }
   })
-  const subscription = subscriptions?.at(0) || null
-  const productName = typeof subscription?.product === 'object' && subscription?.product?.name ? subscription?.product?.name : null
+  const subscription = (subscriptions?.at(0) || null) as Subscription | null
+
+  // Get subscription directly from Stripe for verification
+  let stripeSubscription = null
+  let stripePlan = null
+  let stripeProduct = null
+  if (user?.stripeCustomerId) {
+    const stripeSubscriptions = await stripe.subscriptions.list({
+      customer: user.stripeCustomerId,
+      status: 'all',
+      expand: ['data.default_payment_method', 'data.items.data.price']
+    })
+    stripeSubscription = stripeSubscriptions.data[0]
+    if (stripeSubscription) {
+      stripePlan = stripeSubscription.items.data[0]?.price
+      if (stripePlan?.product && typeof stripePlan.product === 'string') {
+        stripeProduct = await stripe.products.retrieve(stripePlan.product)
+      }
+    }
+    console.log('Stripe Subscription:', stripeSubscription)
+    console.log('Database Subscription:', subscription)
+  }
+
+  // Use Stripe subscription data if available, fallback to database
+  const activeSubscription = stripeSubscription?.status === 'active' ? stripeSubscription : subscription
+  const productName = stripeProduct?.name || (subscription?.product && typeof subscription.product === 'object' ? subscription.product.name : null)
   const paymentMethodsList = user?.stripeCustomerId ? await stripe.paymentMethods.list({ customer: user?.stripeCustomerId }) : null
   const paymentMethods = paymentMethodsList?.data || []
 
+  // Format price
+  const formatPrice = (amount: number | null, currency: string) => {
+    if (!amount) return null
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase()
+    }).format(amount / 100)
+  }
+
+  const subscriptionPrice = stripePlan ? formatPrice(stripePlan.unit_amount, stripePlan.currency) : null
+  const interval = stripePlan?.recurring?.interval
+  const priceLabel = interval ? `${subscriptionPrice}/${interval}` : subscriptionPrice
+
   let subscriptionStatusColor: BadgeProps['color'] = 'green'
-  switch (subscription?.status) {
+  const status = activeSubscription?.status
+  switch (status) {
     case 'incomplete_expired':
     case 'incomplete':
     case 'paused':
@@ -39,14 +80,30 @@ export default async function SubscriptionsPage() {
       break
   }
 
+  // Helper function to format dates from either Stripe or database format
+  const formatDate = (date: string | number | null | undefined) => {
+    if (!date) return null
+    const dateObj = typeof date === 'string' ? new Date(date) : new Date(date * 1000)
+    return dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
+  // Get the appropriate dates based on subscription type
+  const renewalDate = stripeSubscription
+    ? formatDate(stripeSubscription.current_period_end)
+    : subscription?.currentPeriodEnd
+      ? formatDate(subscription.currentPeriodEnd)
+      : null
+
+  const canceledDate = stripeSubscription ? formatDate(stripeSubscription.ended_at) : subscription?.endedAt ? formatDate(subscription.endedAt) : null
+
   return (
     <div className="space-y-4 md:space-y-8">
-      {!subscription ? (
+      {!activeSubscription ? (
         <Alert color="yellow" className="p-4 font-bold">
           You currently don&apos;t have a subscription.
         </Alert>
       ) : null}
-      {!!subscription ? (
+      {!!activeSubscription ? (
         <Card className="dark:border-white/5 dark:bg-[#1e1e1e]">
           <CardHeader>
             <h2 className="text-2xl font-medium">Current Subscription</h2>
@@ -55,28 +112,31 @@ export default async function SubscriptionsPage() {
             <div className="space-y-4">
               <div className="flex justify-between">
                 <div>Plan:</div>
-                <div>{productName || 'Free'}</div>
+                <div className="text-right">
+                  <div className="font-medium">{productName || 'Free'}</div>
+                  {priceLabel && <div className="text-sm text-zinc-500 dark:text-zinc-400">{priceLabel}</div>}
+                </div>
               </div>
-              {subscription?.status && (
+              {status && (
                 <div className="flex justify-between">
                   <div>Status:</div>
                   <div>
                     <Badge color={subscriptionStatusColor} duotone size="sm" className="capitalize">
-                      {String(subscription?.status || 'Free').replaceAll('_', ' ')}
+                      {String(status || 'Free').replaceAll('_', ' ')}
                     </Badge>
                   </div>
                 </div>
               )}
-              {subscription?.currentPeriodEnd && subscription?.status !== 'canceled' && (
+              {renewalDate && status !== 'canceled' && (
                 <div className="flex justify-between">
                   <div>Renewal Date:</div>
-                  <div>{new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  <div>{renewalDate}</div>
                 </div>
               )}
-              {subscription?.endedAt && subscription?.status === 'canceled' && (
+              {canceledDate && status === 'canceled' && (
                 <div className="flex justify-between">
                   <div>Canceled Date:</div>
-                  <div>{new Date(subscription.endedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  <div>{canceledDate}</div>
                 </div>
               )}
             </div>

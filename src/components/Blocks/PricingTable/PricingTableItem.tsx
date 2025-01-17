@@ -53,26 +53,29 @@ export default function PricingTableItem({ product, currency = 'usd', interval =
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     startTransition(async () => {
-      const response = await createCheckoutSession([{ quantity: 1, stripePriceId: price.stripeID, stripeProductId: product.stripeID as string }], {
-        cancel: window.location.href,
-        success: new URL('/subscription-success', window.location.href).href
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          priceId: price.stripeID,
+          redirects: {
+            cancel: window.location.href,
+            success: new URL('/subscription-success', window.location.href).href
+          }
+        })
       })
 
-      if (!response.success) {
-        setErrorMessage('Failed to create checkout session')
-        return
-      }
-      const stripe = await import('@stripe/stripe-js').then(({ loadStripe }) => loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!))
-      if (!stripe) {
-        setErrorMessage('Stripe.js failed to load')
-        return
-      }
-      const { error } = await stripe.redirectToCheckout({
-        sessionId: response.sessionId
-      })
+      const data = await response.json()
 
-      if (error) {
-        setErrorMessage(error.message || 'Checkout failed')
+      if (!response.ok) {
+        console.error('Checkout error:', data.error)
+        return
+      }
+
+      if (data.sessionId) {
+        window.location.assign(data.sessionId)
       }
     })
   }

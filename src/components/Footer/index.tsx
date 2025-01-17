@@ -2,7 +2,6 @@ import Container from '@/components/Container'
 import ThemeChanger from '@/components/ThemeChanger'
 import { GLOBAL_SETTINGS_SLUG } from '@/payload/globals/config'
 import { getCachedGlobal } from '@/payload/utils/getGlobal'
-import Logo from '@/public/logo.svg'
 import Link from 'next/link'
 import { FooterMenu, Page } from '~/payload-types'
 
@@ -16,10 +15,7 @@ const Footer = async () => {
       <Container>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="mb-6 flex items-center space-x-2">
-              <Logo className="h-10 w-10" />
-              {settings?.appName ? <span className="text-xl font-bold">{settings?.appName}</span> : null}
-            </div>
+            <div className="mb-6 flex items-center space-x-2">{settings?.appName ? <span className="text-xl font-bold">{settings?.appName}</span> : null}</div>
             {settings?.appDescription ? <p className="text-zinc-500">{settings?.appDescription}</p> : null}
             <div className="mt-6 flex items-center space-x-4"></div>
           </div>

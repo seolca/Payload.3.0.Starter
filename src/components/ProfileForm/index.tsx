@@ -12,8 +12,21 @@ import { useFormState } from 'react-dom'
 import { toast } from 'sonner'
 import DeleteAccountSection from './DeleteAccountSection'
 
+type UserFormData = User & {
+  companyName?: string
+  phone?: string
+  address?: {
+    line1?: string
+    line2?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    country?: string
+  }
+}
+
 const ProfileForm = ({ user }: { user: User }) => {
-  const [formData, setFormData] = useState<User>(user)
+  const [formData, setFormData] = useState<UserFormData>(user)
 
   const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -30,7 +43,7 @@ const ProfileForm = ({ user }: { user: User }) => {
     <div className="space-y-6">
       <div className="text-left">
         <h2 className="text-3xl font-bold">Update Profile</h2>
-        <p className="text-gray-500 dark:text-gray-400">Make changes to your profile details below.</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Make changes to your profile details below.</p>
       </div>
       <div className="space-y-4">
         <form action={updateUserAction} className="space-y-4">
@@ -48,12 +61,107 @@ const ProfileForm = ({ user }: { user: User }) => {
           <Card>
             <CardContent className="pt-6">
               <Fieldset>
-                <Label className="text-base" htmlFor="user-name">
-                  Name
-                </Label>
-                <p className="!mb-4 text-sm text-zinc-500">Display name for your account.</p>
-                <Input id="user-name" name="name" placeholder="Enter your first name" value={formData?.name || ''} onChange={handleOnChange} />
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" name="name" placeholder="Enter your name" value={formData?.name || ''} onChange={handleOnChange} />
               </Fieldset>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Fieldset>
+                <Label className="text-base" htmlFor="companyName">
+                  Company Name
+                </Label>
+                <p className="!mb-4 text-sm text-zinc-500">Your company name for billing purposes.</p>
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  placeholder="Enter your company name"
+                  value={formData?.companyName || ''}
+                  onChange={handleOnChange}
+                />
+              </Fieldset>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Fieldset>
+                <Label className="text-base" htmlFor="phone">
+                  Phone Number
+                </Label>
+                <p className="!mb-4 text-sm text-zinc-500">Your contact phone number.</p>
+                <Input id="phone" name="phone" type="tel" placeholder="Enter your phone number" value={formData?.phone || ''} onChange={handleOnChange} />
+              </Fieldset>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Label className="text-base">Address</Label>
+              <p className="!mb-4 text-sm text-zinc-500">Your billing address.</p>
+              <div className="space-y-4">
+                <Fieldset>
+                  <Label htmlFor="address.line1">Street Address</Label>
+                  <Input
+                    id="address.line1"
+                    name="address.line1"
+                    placeholder="Enter your street address"
+                    value={formData?.address?.line1 || ''}
+                    onChange={(e) => setFormData({ ...formData, address: { ...formData.address, line1: e.target.value } })}
+                  />
+                </Fieldset>
+                <Fieldset>
+                  <Label htmlFor="address.line2">Apartment, suite, etc.</Label>
+                  <Input
+                    id="address.line2"
+                    name="address.line2"
+                    placeholder="Enter apartment, suite, etc."
+                    value={formData?.address?.line2 || ''}
+                    onChange={(e) => setFormData({ ...formData, address: { ...formData.address, line2: e.target.value } })}
+                  />
+                </Fieldset>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <Fieldset>
+                    <Label htmlFor="address.city">City</Label>
+                    <Input
+                      id="address.city"
+                      name="address.city"
+                      placeholder="Enter city"
+                      value={formData?.address?.city || ''}
+                      onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })}
+                    />
+                  </Fieldset>
+                  <Fieldset>
+                    <Label htmlFor="address.state">State/Province</Label>
+                    <Input
+                      id="address.state"
+                      name="address.state"
+                      placeholder="Enter state"
+                      value={formData?.address?.state || ''}
+                      onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })}
+                    />
+                  </Fieldset>
+                  <Fieldset>
+                    <Label htmlFor="address.postalCode">ZIP/Postal Code</Label>
+                    <Input
+                      id="address.postalCode"
+                      name="address.postalCode"
+                      placeholder="Enter postal code"
+                      value={formData?.address?.postalCode || ''}
+                      onChange={(e) => setFormData({ ...formData, address: { ...formData.address, postalCode: e.target.value } })}
+                    />
+                  </Fieldset>
+                </div>
+                <Fieldset>
+                  <Label htmlFor="address.country">Country</Label>
+                  <Input
+                    id="address.country"
+                    name="address.country"
+                    placeholder="Enter country"
+                    value={formData?.address?.country || ''}
+                    onChange={(e) => setFormData({ ...formData, address: { ...formData.address, country: e.target.value } })}
+                  />
+                </Fieldset>
+              </div>
             </CardContent>
           </Card>
           <Card>

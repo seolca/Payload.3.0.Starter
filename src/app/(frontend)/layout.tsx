@@ -15,7 +15,7 @@ const fontSans = FontSans({
 })
 
 export const metadata: Metadata = {
-  title: { default: 'Easy Start', template: '%s | Payload SaaS Starter' },
+  title: { default: 'Account | Seol.ca', template: '%s | Seol.ca' },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL!)
 }
 

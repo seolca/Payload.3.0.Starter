@@ -5,6 +5,11 @@ import { isAdmin, isAdminOrCurrentUser } from '@/payload/access'
 import parseCookieString from '@/utils/parseCookieString'
 import type { CollectionConfig } from 'payload/types'
 import { COLLECTION_SLUG_SESSIONS, COLLECTION_SLUG_USER } from './config'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2024-04-10'
+})
 
 const ADMIN_AUTH_GROUP = 'Auth'
 
@@ -78,9 +83,72 @@ export const users: CollectionConfig = {
   },
   hooks: {
     afterChange: [
-      async ({ doc, req }) => {
+      async ({ doc, req, operation }) => {
         const payload = req.payload
         await revalidateUser(doc, payload)
+
+        // Create Stripe customer if UID exists but no Stripe customer exists
+        if (doc.uid && !doc.stripeCustomerId) {
+          try {
+            const customer = await stripe.customers.create({
+              name: doc.name || undefined,
+              email: doc.email || undefined,
+              phone: doc.phone || undefined,
+              address: doc.address
+                ? {
+                    line1: doc.address.line1 || undefined,
+                    line2: doc.address.line2 || undefined,
+                    city: doc.address.city || undefined,
+                    state: doc.address.state || undefined,
+                    postal_code: doc.address.postalCode || undefined,
+                    country: doc.address.country || undefined
+                  }
+                : undefined,
+              metadata: {
+                uid: doc.uid,
+                company_name: doc.companyName || undefined
+              }
+            })
+
+            // Update user with Stripe customer ID
+            await payload.update({
+              collection: COLLECTION_SLUG_USER,
+              id: doc.id,
+              data: {
+                stripeCustomerId: customer.id
+              }
+            })
+          } catch (error) {
+            console.error('Error creating Stripe customer:', error)
+          }
+        }
+
+        // Update Stripe customer metadata if UID changed and customer exists
+        if (operation === 'update' && doc.stripeCustomerId) {
+          try {
+            await stripe.customers.update(doc.stripeCustomerId, {
+              name: doc.name || undefined,
+              email: doc.email || undefined,
+              phone: doc.phone || undefined,
+              address: doc.address
+                ? {
+                    line1: doc.address.line1 || undefined,
+                    line2: doc.address.line2 || undefined,
+                    city: doc.address.city || undefined,
+                    state: doc.address.state || undefined,
+                    postal_code: doc.address.postalCode || undefined,
+                    country: doc.address.country || undefined
+                  }
+                : undefined,
+              metadata: {
+                uid: doc.uid,
+                company_name: doc.companyName || undefined
+              }
+            })
+          } catch (error) {
+            console.error('Error updating Stripe customer metadata:', error)
+          }
+        }
       }
     ]
   },
@@ -95,10 +163,36 @@ export const users: CollectionConfig = {
   },
   fields: [
     { name: 'name', type: 'text', saveToJWT: true },
+    { name: 'companyName', type: 'text', saveToJWT: true },
+    { name: 'phone', type: 'text', saveToJWT: true },
+    {
+      name: 'address',
+      type: 'group',
+      saveToJWT: true,
+      fields: [
+        { name: 'line1', type: 'text' },
+        { name: 'line2', type: 'text' },
+        { name: 'city', type: 'text' },
+        { name: 'state', type: 'text' },
+        { name: 'postalCode', type: 'text' },
+        { name: 'country', type: 'text' }
+      ]
+    },
     { name: 'imageUrl', type: 'text', saveToJWT: true },
     { name: 'role', type: 'select', options: ['admin', 'user'], saveToJWT: true },
     { name: 'emailVerified', type: 'date' },
     { name: 'stripeCustomerId', type: 'text', saveToJWT: true, admin: { readOnly: true, position: 'sidebar' } },
+    {
+      name: 'uid',
+      type: 'text',
+      saveToJWT: true,
+      admin: {
+        description: 'Unique identifier used to link multiple Stripe customers',
+        position: 'sidebar'
+      },
+      unique: true,
+      index: true
+    },
     {
       name: 'accounts',
       type: 'array',

@@ -5,9 +5,10 @@ import type { CollectionBeforeChangeHook, CollectionConfig } from 'payload/types
 import Stripe from 'stripe'
 import type { Price } from '~/payload-types'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2022-08-01' })
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
 
 const populateProductRelationshipFieldFromStripeProductId: CollectionBeforeChangeHook = async ({ req, data }) => {
+  if (!data?.stripeProductId) return data
   if (!data.stripeProductId.startsWith('prod_')) return data
 
   const { docs } = await req.payload.find({
@@ -25,6 +26,7 @@ const populateProductRelationshipFieldFromStripeProductId: CollectionBeforeChang
 }
 
 const populatePrices: CollectionBeforeChangeHook = async ({ data, req }) => {
+  if (!data?.stripeID) return data
   if (!data.stripeID.startsWith('prod_')) return data
 
   const { data: prices } = await stripe.prices.list({
@@ -34,11 +36,12 @@ const populatePrices: CollectionBeforeChangeHook = async ({ data, req }) => {
 
   const priceIds = prices.map((price) => price.id)
 
-  const { docs } = (await req.payload.find({
+  const result = await req.payload.find({
     collection: COLLECTION_SLUG_PRICES,
     where: { stripeID: { in: priceIds } }
-  })) as { docs: Price[] }
+  })
 
+  const docs = result.docs as unknown as Price[]
   const existingPriceIds = new Set(docs.map((doc) => doc.stripeID))
 
   const missingPrices = prices.filter((price) => !existingPriceIds.has(price.id))
@@ -134,32 +137,130 @@ export const prices: CollectionConfig = {
   slug: COLLECTION_SLUG_PRICES,
   admin: {
     useAsTitle: 'id',
-    group
+    group,
+    defaultColumns: ['stripeID', 'product', 'unitAmount', 'currency', 'type', 'interval']
   },
   access,
   hooks: {
-    beforeChange: [populateProductRelationshipFieldFromStripeProductId]
+    beforeChange: [
+      async ({ req, data, operation }) => {
+        // Only run on create
+        if (operation !== 'create') return data
+
+        // Create price in Stripe
+        if (!data.stripeProductId?.startsWith('prod_')) {
+          throw new Error('Invalid Stripe Product ID')
+        }
+
+        try {
+          const stripePrice = await stripe.prices.create({
+            product: data.stripeProductId,
+            unit_amount: data.unitAmount,
+            currency: data.currency,
+            recurring:
+              data.type === 'recurring'
+                ? {
+                    interval: data.interval,
+                    interval_count: data.intervalCount || 1
+                  }
+                : undefined
+          })
+
+          // Set the Stripe ID from the created price
+          data.stripeID = stripePrice.id
+          return data
+        } catch (error) {
+          console.error('Error creating Stripe price:', error)
+          throw error
+        }
+      },
+      populateProductRelationshipFieldFromStripeProductId
+    ]
   },
   fields: [
-    { name: 'stripeID', type: 'text', required: true, admin: { position: 'sidebar', readOnly: true } },
-    { name: 'stripeProductId', type: 'text', required: true, admin: { position: 'sidebar', readOnly: true } },
-    { name: 'product', type: 'relationship', relationTo: COLLECTION_SLUG_PRODUCTS, admin: { readOnly: true } },
-    { name: 'active', type: 'checkbox', required: true, admin: { position: 'sidebar' } },
+    {
+      name: 'stripeID',
+      type: 'text',
+      required: true,
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        description: 'This will be automatically generated when the price is created'
+      }
+    },
+    {
+      name: 'stripeProductId',
+      type: 'text',
+      required: true,
+      admin: {
+        position: 'sidebar',
+        description: 'The Stripe Product ID (starts with prod_)'
+      }
+    },
+    {
+      name: 'product',
+      type: 'relationship',
+      relationTo: COLLECTION_SLUG_PRODUCTS,
+      admin: {
+        description: 'This will be automatically populated based on the Stripe Product ID',
+        readOnly: true
+      }
+    },
+    { name: 'active', type: 'checkbox', required: true, defaultValue: true, admin: { position: 'sidebar' } },
     { name: 'description', type: 'textarea' },
     {
       type: 'row',
       fields: [
-        { name: 'unitAmount', type: 'number', required: true },
-        { name: 'currency', type: 'text', required: true },
+        {
+          name: 'unitAmount',
+          type: 'number',
+          required: true,
+          min: 0,
+          admin: {
+            description: 'Amount in cents (e.g. 1000 for $10.00)'
+          }
+        },
+        {
+          name: 'currency',
+          type: 'text',
+          required: true,
+          defaultValue: 'usd',
+          admin: {
+            description: 'Three-letter currency code (e.g. usd)'
+          }
+        },
         { name: 'type', type: 'select', options: formatOptions(PricingType), required: true }
       ]
     },
     {
       type: 'row',
       fields: [
-        { name: 'interval', type: 'select', options: formatOptions(PricingPlanInterval) },
-        { name: 'intervalCount', type: 'number' },
-        { name: 'trialPeriodDays', type: 'number' }
+        {
+          name: 'interval',
+          type: 'select',
+          options: formatOptions(PricingPlanInterval),
+          admin: {
+            condition: (data) => data.type === 'recurring'
+          }
+        },
+        {
+          name: 'intervalCount',
+          type: 'number',
+          min: 1,
+          admin: {
+            description: 'Number of intervals between charges',
+            condition: (data) => data.type === 'recurring'
+          }
+        },
+        {
+          name: 'trialPeriodDays',
+          type: 'number',
+          min: 0,
+          admin: {
+            description: 'Number of trial days (optional)',
+            condition: (data) => data.type === 'recurring'
+          }
+        }
       ]
     }
   ]

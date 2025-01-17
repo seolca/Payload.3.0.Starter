@@ -70,7 +70,8 @@ export const getDocument = async <K extends keyof Config['collections']>({
         })
         .then((result) => {
           if (!result || !result.docs || result.docs.length === 0) return null
-          return result.docs.at(0) as Config['collections'][K] | null
+          const doc = result.docs.at(0)
+          return doc as unknown as Config['collections'][K] | null
         })
     },
     cacheKey,

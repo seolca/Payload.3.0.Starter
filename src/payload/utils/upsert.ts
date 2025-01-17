@@ -30,7 +30,7 @@ export const payloadUpsert = async <T extends keyof Config['collections']>({
         data: data as any
       })
 
-      return updatedDoc || null
+      return updatedDoc as unknown as Config['collections'][T] | null
     }
 
     const newDoc = await payload.create({
@@ -38,7 +38,7 @@ export const payloadUpsert = async <T extends keyof Config['collections']>({
       data
     })
 
-    return newDoc
+    return newDoc as unknown as Config['collections'][T]
   } catch (error) {
     console.error(`Error in payloadUpsert: ${error}`)
     throw new Error(`Failed to upsert document in collection ${collection}`)

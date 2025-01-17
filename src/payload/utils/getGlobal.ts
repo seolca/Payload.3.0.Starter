@@ -13,10 +13,10 @@ export const generateGlobalCacheKey = (slug: Global): string => {
 export const getGlobal = async (slug: Global, depth = 0): Promise<SiteSetting | null> => {
   const payload = await getPayloadHMR({ config: configPromise })
 
-  const global = await payload.findGlobal({
+  const global = (await payload.findGlobal({
     slug,
     depth
-  })
+  })) as SiteSetting | null
 
   return global || null
 }

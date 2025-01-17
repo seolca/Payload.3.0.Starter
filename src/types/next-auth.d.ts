@@ -6,7 +6,9 @@ declare module 'next-auth' {
   interface Session {
     user: PayloadUser & DefaultSession['user']
   }
-  interface User extends PayloadUser {}
+  interface User extends PayloadUser {
+    uid?: string
+  }
 }
 
 declare module 'next-auth/jwt' {
@@ -16,5 +18,6 @@ declare module 'next-auth/jwt' {
     imageUrl?: string
     role?: string
     emailVerified?: string
+    uid?: string
   }
 }

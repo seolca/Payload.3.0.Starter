@@ -6,8 +6,8 @@ import cn from '@/utils/cn'
 
 const buttonVariants = cva(
   `inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-white transition-all duration-300 ease-in-out
-  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none
-  disabled:opacity-50 dark:ring-offset-zinc-950 dark:focus-visible:ring-blue-500/80`,
+  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50
+  dark:ring-offset-zinc-950 dark:focus-visible:ring-blue-500/80`,
   {
     variants: {
       color: {
@@ -47,15 +47,15 @@ const buttonVariants = cva(
   }
 )
 
-export type ButtonProps = React.ComponentPropsWithRef<'button'> &
+export type ButtonProps = React.ComponentPropsWithoutRef<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }
 
-const Button = ({ className, variant, size, asChild = false, color, ref, ...props }: ButtonProps) => {
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, color, ...props }, ref) => {
   const Comp = asChild ? Slot : 'button'
   return <Comp className={cn(buttonVariants({ variant, size, className, color }))} ref={ref} {...props} />
-}
+})
 
 Button.displayName = 'Button'
 

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import Stripe from 'stripe'
 import authConfig from '@/lib/auth/config'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2022-08-01' })
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
 
 type CreateBillingPortalSessionResponse = { success: true } | { success: false; error: string }
 
