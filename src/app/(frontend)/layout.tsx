@@ -9,9 +9,12 @@ import { Inter as FontSans } from 'next/font/google'
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  weight: 'variable',
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
-  display: 'swap'
+  display: 'swap',
+  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+  preload: true,
+  adjustFontFallback: true
 })
 
 export const metadata: Metadata = {
@@ -25,8 +28,8 @@ export const viewport: Viewport = {
 
 const Layout: React.FC<{ children: React.ReactNode }> = async ({ children }) => {
   return (
-    <html lang="en" className={cn(fontSans.variable, 'h-full')} suppressHydrationWarning>
-      <body className="overflow-x-hidden bg-zinc-50 font-sans antialiased dark:bg-zinc-940 dark:text-white">
+    <html lang="en" className={cn(fontSans.variable, 'font-feature-default h-full')} suppressHydrationWarning>
+      <body className="overflow-x-hidden bg-zinc-50 font-sans text-base antialiased dark:bg-zinc-940 dark:text-white">
         <ThemeProvider attribute="class">
           <div className="app flex min-h-screen flex-col">
             <Header />
